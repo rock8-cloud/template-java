@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Use the same Maven 3.9 / Temurin 21 image as the Dockerfile build stage.
+      # This repository has no Maven wrapper, so the image keeps the toolchain
+      # explicit instead of relying on the runner's Maven installation.
+      - name: Test
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE:/app"
+          -w /app
+          maven:3.9-eclipse-temurin-21
+          mvn -B verify
+
+  docker:
+    name: docker
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t template-java .
